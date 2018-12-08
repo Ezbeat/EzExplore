@@ -2,11 +2,11 @@
 
 #include <iostream>
 
-EzExplore::Errors exploreFileCallback(const EzExplore::FileInfo& fileInfo)
+EzExplore::Errors exploreFileCallback(_In_ const EzExplore::FileInfo& fileInfo)
 {
-    if ((fileInfo.fileAttributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY)
+    if (fileInfo.isDirectory == true)
     {
-        std::wcout << L"[Folder] ";
+        std::wcout << L"[Directory] ";
     }
     else
     {
@@ -15,7 +15,16 @@ EzExplore::Errors exploreFileCallback(const EzExplore::FileInfo& fileInfo)
 
     std::wcout << fileInfo.filePath << std::endl;
 
-    // To stop: EzExplore::Errors::kStopExplore 
+    // To stop: EzExplore::Errors::kStopExplore
+    /* 
+        To enter directory: EzExplore::Errors::kEnterDirectory
+    
+        if (fileInfo.isDirectory == true)
+        {
+            return EzExplore::Errors::kEnterDirectory;
+        }
+    */
+
     return EzExplore::Errors::kSuccess;
 }
 
