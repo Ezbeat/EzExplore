@@ -7,9 +7,9 @@ EzExplore::Errors exploreFileCallback(
     _In_opt_ void* userContext
 )
 {
-    if ((fileInfo.fileAttributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY)
+    if (fileInfo.isDirectory == true)
     {
-        std::wcout << L"[Folder] ";
+        std::wcout << L"[Directory] ";
     }
     else
     {
@@ -18,7 +18,16 @@ EzExplore::Errors exploreFileCallback(
 
     std::wcout << fileInfo.filePath << std::endl;
 
-    // To stop: EzExplore::Errors::kStopExplore 
+    // To stop: EzExplore::Errors::kStopExplore
+    /* 
+        To enter directory: EzExplore::Errors::kEnterDirectory
+    
+        if (fileInfo.isDirectory == true)
+        {
+            return EzExplore::Errors::kEnterDirectory;
+        }
+    */
+
     return EzExplore::Errors::kSuccess;
 }
 
