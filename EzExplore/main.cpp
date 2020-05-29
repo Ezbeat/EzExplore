@@ -2,7 +2,10 @@
 
 #include <iostream>
 
-EzExplore::Errors exploreFileCallback(const EzExplore::FileInfo& fileInfo)
+EzExplore::Errors exploreFileCallback(
+    _In_ const EzExplore::FileInfo& fileInfo, 
+    _In_opt_ void* userContext
+)
 {
     if ((fileInfo.fileAttributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY)
     {
