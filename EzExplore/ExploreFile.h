@@ -45,13 +45,21 @@ public:
     ~ExploreFile();
 
     Errors StartExploreFile(
-        _In_ const std::wstring& exploreFolderPath,
+        _In_ const std::wstring& exploreDirectoryPath,
         _In_ const ExploreFileCallback& exploreFileCallback,
         _In_opt_ void* userContext = nullptr,
         _In_opt_ bool detailFileInfo = false
     );
 
+    Errors GetItemCount(
+        _In_ const std::wstring& directoryPath,
+        _Out_opt_ uint32_t* fileCount,
+        _Out_opt_ uint32_t* directoryCount
+    );
+
 private:
+    void InitFileInfo_(_Out_ FileInfo& fileInfo);
+
     class RAIIRegister
     {
     private:

@@ -68,6 +68,7 @@ EzExplore::Errors EzExplore::ExploreFile::StartExploreFile(
         }
 
         // Set FileInfo
+        InitFileInfo_(fileInfo);
         if (detailFileInfo == true)
         {
             fileInfo.fileAttributes = findData.dwFileAttributes;
@@ -117,4 +118,67 @@ EzExplore::Errors EzExplore::ExploreFile::StartExploreFile(
 
     retValue = Errors::kSuccess;
     return retValue;
+}
+
+EzExplore::Errors EzExplore::ExploreFile::GetItemCount(
+    _In_ const std::wstring& directoryPath,
+    _Out_opt_ uint32_t* fileCount,
+    _Out_opt_ uint32_t* directoryCount
+)
+{
+    Errors retValue = Errors::kUnsuccess;
+
+    uint32_t countArray[2] = { 0, }; // Index 0: File Count, Index 1: Directory Count
+
+    auto exploreCallbackLambda = [](_In_ const FileInfo& fileInfo, _In_opt_ void* userContext)->Errors
+    {
+        if (fileInfo.isDirectory == true)
+        {
+            wprintf(L"[DIR] %s \n", fileInfo.filePath.c_str());
+            (static_cast<uint32_t*>(userContext))[1]++;
+            return Errors::kEnterDirectory;
+        }
+
+        wprintf(L"[FILE] %s \n", fileInfo.filePath.c_str());
+        (static_cast<uint32_t*>(userContext))[0]++;
+        return Errors::kSuccess;
+    };
+
+    if (this->StartExploreFile(directoryPath, exploreCallbackLambda, countArray) != Errors::kSuccess)
+    {
+        return retValue;
+    }
+
+    if (fileCount != nullptr)
+    {
+        *fileCount = countArray[0];
+    }
+
+    if (directoryCount != nullptr)
+    {
+        *directoryCount = countArray[1];
+    }
+
+    retValue = Errors::kSuccess;
+    return retValue;
+}
+
+void EzExplore::ExploreFile::InitFileInfo_(
+    _Out_ FileInfo& fileInfo
+)
+{
+    fileInfo.fileAttributes = 0;
+    fileInfo.creationTime = 0;
+    fileInfo.lastAccessTime = 0;
+    fileInfo.lastWriteTime = 0;
+    fileInfo.fileSize = 0;
+    if (fileInfo.fileName.length() != 0)
+    {
+        fileInfo.fileName.clear();
+    }
+    if (fileInfo.filePath.length() != 0)
+    {
+        fileInfo.filePath.clear();
+    }
+    fileInfo.isDirectory = false;
 }
