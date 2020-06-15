@@ -134,12 +134,10 @@ EzExplore::Errors EzExplore::ExploreFile::GetItemCount(
     {
         if (fileInfo.isDirectory == true)
         {
-            wprintf(L"[DIR] %s \n", fileInfo.filePath.c_str());
             (static_cast<uint32_t*>(userContext))[1]++;
             return Errors::kEnterDirectory;
         }
 
-        wprintf(L"[FILE] %s \n", fileInfo.filePath.c_str());
         (static_cast<uint32_t*>(userContext))[0]++;
         return Errors::kSuccess;
     };
