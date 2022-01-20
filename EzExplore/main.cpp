@@ -4,32 +4,20 @@
 #include <inttypes.h>
 
 EzExplore::Errors exploreFileCallback(
-    const EzExplore::FileInfo& fileInfo,
+    const EzExplore::FileInfoA& fileInfo,
     /*_In_opt_*/ void* userContext
 )
 {
     if (fileInfo.isDirectory == true)
     {
-#ifdef _WIN32
-        wprintf(L"[Directory] ");
-#elif __linux__
         printf("[Directory] ");
-#endif
     }
     else
     {
-#ifdef _WIN32
-        wprintf(L"[File] FileSize: %" PRIu64 ", ", fileInfo.fileSize);
-#elif __linux__
         printf("[File] FileSize: %" PRIu64 ", ", fileInfo.fileSize);
-#endif
     }
 
-#ifdef _WIN32
-    wprintf(L"%s \n", fileInfo.filePath.c_str());
-#elif __linux__
     printf("%s \n", fileInfo.filePath.c_str());
-#endif
 
     if (fileInfo.isDirectory == true)
     {
@@ -57,25 +45,38 @@ int main()
     uint32_t fileCount = 0;
     uint32_t directoryCount = 0;
 
+    // [Windows] All possible: "D:\\Test", "D:\\Test\\", "D:\\Test\\*"
 #ifdef _WIN32
-    // All possible: "D:\\Test", "D:\\Test\\", "D:\\Test\\*"
+    // Unicode Test
     exploreFile.GetItemCount(L"test", &fileCount, &directoryCount);
-    retValue = exploreFile.StartExploreFile(L"test", exploreFileCallback);
-#elif __linux__
-    exploreFile.GetItemCount("test", &fileCount, &directoryCount);
     retValue = exploreFile.StartExploreFile("test", exploreFileCallback);
-#endif
     if (retValue == EzExplore::Errors::kSuccess)
     {
-        std::wcout << L"Success" << std::endl;
+        printf("Success \n");
     }
     else if (retValue == EzExplore::Errors::kStopExplore)
     {
-        std::wcout << L"Stop" << std::endl;
+        printf("Stop \n");
     }
     else if (retValue == EzExplore::Errors::kUnsuccess)
     {
-        std::wcout << L"Unsuccess" << std::endl;
+        printf("Unsuccess \n");
+    }
+#endif
+    // Ansi Test
+    exploreFile.GetItemCount("test", &fileCount, &directoryCount);
+    retValue = exploreFile.StartExploreFile("test", exploreFileCallback);
+    if (retValue == EzExplore::Errors::kSuccess)
+    {
+        printf("Success \n");
+    }
+    else if (retValue == EzExplore::Errors::kStopExplore)
+    {
+        printf("Stop \n");
+    }
+    else if (retValue == EzExplore::Errors::kUnsuccess)
+    {
+        printf("Unsuccess \n");
     }
 
     return 0;
