@@ -7,10 +7,9 @@
 #include <string>
 #include <functional>
 
-#include <Windows.h>
-
 namespace EzExplore
 {
+#ifdef _WIN32
 struct FileInfo
 {
     FileInfo()
@@ -19,6 +18,7 @@ struct FileInfo
         creationTime = 0;
         lastAccessTime = 0;
         lastWriteTime = 0;
+
         fileSize = 0;
         isDirectory = false;
     }
@@ -35,8 +35,43 @@ struct FileInfo
     std::wstring filePath;
     bool isDirectory;
 };
+#elif __linux__
+struct FileInfo
+{
+    FileInfo()
+    {
+        deviceId = 0;
+        inodeNumber = 0;
+        mode = 0;
+        uid = 0;
+        gid = 0;
+        lastAccessTime = 0;
+        lastModificationTime = 0;
+        lastStatusChangeTime = 0;
 
-typedef Errors(*ExploreFileCallback)(_In_ const FileInfo& fileInfo, _In_opt_ void* userContext);
+        fileSize = 0;
+        isDirectory = false;
+    }
+
+    // Detail
+    dev_t deviceId;
+    ino_t inodeNumber;
+    mode_t mode;
+    uid_t uid;
+    gid_t gid;
+    time_t lastAccessTime;
+    time_t lastModificationTime;
+    time_t lastStatusChangeTime;
+
+    // Normal
+    uint64_t fileSize;
+    std::string fileName;
+    std::string filePath;
+    bool isDirectory;
+};
+#endif
+
+typedef Errors(*ExploreFileCallback)(const FileInfo& fileInfo, /*_In_opt_*/ void* userContext);
 
 class ExploreFile
 {
@@ -44,21 +79,34 @@ public:
     ExploreFile();
     ~ExploreFile();
 
+#ifdef _WIN32
     Errors StartExploreFile(
-        _In_ const std::wstring& exploreDirectoryPath,
-        _In_ const ExploreFileCallback& exploreFileCallback,
-        _In_opt_ void* userContext = nullptr,
-        _In_opt_ bool detailFileInfo = false
+        const std::wstring& exploreDirectoryPath,
+        const ExploreFileCallback& exploreFileCallback,
+        /*_In_opt_*/ void* userContext = nullptr,
+        /*_In_opt_*/ bool detailFileInfo = false
     );
+#elif __linux__
+    Errors StartExploreFile(
+        const std::string& exploreDirectoryPath,
+        const ExploreFileCallback& exploreFileCallback,
+        /*_In_opt_*/ void* userContext = nullptr,
+        /*_In_opt_*/ bool detailFileInfo = false
+    );
+#endif
 
     Errors GetItemCount(
-        _In_ const std::wstring& directoryPath,
-        _Out_opt_ uint32_t* fileCount,
-        _Out_opt_ uint32_t* directoryCount
+#ifdef _WIN32
+        const std::wstring& directoryPath,
+#elif __linux__
+        const std::string& directoryPath,
+#endif
+        /*_Out_opt_*/ uint32_t* fileCount,
+        /*_Out_opt_*/ uint32_t* directoryCount
     );
 
 private:
-    void InitFileInfo_(_Out_ FileInfo& fileInfo);
+    void InitFileInfo_(/*_Out_*/ FileInfo& fileInfo);
 
     class RAIIRegister
     {

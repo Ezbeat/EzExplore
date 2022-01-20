@@ -1,5 +1,12 @@
 #include "ExploreFile.h"
 
+#ifdef _WIN32
+#include <Windows.h>
+#elif __linux__
+#include <sys/stat.h>
+#include <dirent.h>
+#endif
+
 EzExplore::ExploreFile::ExploreFile()
 {
 }
@@ -9,11 +16,12 @@ EzExplore::ExploreFile::~ExploreFile()
 {
 }
 
+#ifdef _WIN32
 EzExplore::Errors EzExplore::ExploreFile::StartExploreFile(
-    _In_ const std::wstring& exploreDirectoryPath,
-    _In_ const ExploreFileCallback& exploreFileCallback,
-    _In_opt_ void* userContext /*= nullptr*/,
-    _In_opt_ bool detailFileInfo /*= false */
+    const std::wstring& exploreDirectoryPath,
+    const ExploreFileCallback& exploreFileCallback,
+    /*_In_opt_*/ void* userContext /*= nullptr*/,
+    /*_In_opt_*/ bool detailFileInfo /*= false */
 )
 {
     Errors retValue = Errors::kUnsuccess;
@@ -69,6 +77,15 @@ EzExplore::Errors EzExplore::ExploreFile::StartExploreFile(
 
         // Set FileInfo
         InitFileInfo_(fileInfo);
+
+        fileInfo.fileSize = (static_cast<uint64_t>(findData.nFileSizeHigh) << (sizeof(uint32_t) * 8)) + findData.nFileSizeLow;
+        fileInfo.fileName = findData.cFileName;
+        fileInfo.filePath = (exploreDirectoryPath_ + fileInfo.fileName);
+        if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY)
+        {
+            fileInfo.isDirectory = true;
+        }
+
         if (detailFileInfo == true)
         {
             fileInfo.fileAttributes = findData.dwFileAttributes;
@@ -81,14 +98,6 @@ EzExplore::Errors EzExplore::ExploreFile::StartExploreFile(
             fileInfo.lastWriteTime =
                 (static_cast<uint64_t>(findData.ftLastWriteTime.dwHighDateTime) << (sizeof(uint32_t) * 8)) +
                 findData.ftLastWriteTime.dwLowDateTime;
-        }
-
-        fileInfo.fileSize = (static_cast<uint64_t>(findData.nFileSizeHigh) << (sizeof(uint32_t) * 8)) + findData.nFileSizeLow;
-        fileInfo.fileName = findData.cFileName;
-        fileInfo.filePath = (exploreDirectoryPath_ + fileInfo.fileName);
-        if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY)
-        {
-            fileInfo.isDirectory = true;
         }
 
         retValue = exploreFileCallback(fileInfo, userContext);
@@ -120,17 +129,133 @@ EzExplore::Errors EzExplore::ExploreFile::StartExploreFile(
     return retValue;
 }
 
+#elif __linux__
+
+EzExplore::Errors EzExplore::ExploreFile::StartExploreFile(
+    const std::string& exploreDirectoryPath,
+    const ExploreFileCallback& exploreFileCallback,
+    /*_In_opt_*/ void* userContext /*= nullptr*/,
+    /*_In_opt_*/ bool detailFileInfo /*= false */
+)
+{
+    Errors retValue = Errors::kUnsuccess;
+
+    std::string exploreDirectoryPath_ = exploreDirectoryPath;
+
+    DIR* dir = nullptr;
+    dirent* file = nullptr;
+    struct stat fileStatus = { 0, };
+    bool getFileStatus = false;
+
+    FileInfo fileInfo;
+
+    auto raii = RAIIRegister([&]
+        {
+            if (dir != nullptr)
+            {
+                if (closedir(dir) != 0)
+                {
+                    retValue = Errors::kUnsuccess;
+                }
+                else
+                {
+                    dir = nullptr;
+                }
+            }
+        });
+
+    if (exploreDirectoryPath_.back() != '/')
+    {
+        exploreDirectoryPath_.append("/");
+    }
+
+    dir = opendir(exploreDirectoryPath_.c_str());
+    if (dir == nullptr)
+    {
+        return retValue;
+    }
+
+    while ((file = readdir(dir)) != nullptr)
+    {
+        if ((file->d_name[0] == '.' && file->d_name[1] == '\x00') ||
+            (file->d_name[0] == '.' && file->d_name[1] == '.' && file->d_name[2] == '\x00'))
+        {
+            continue;
+        }
+
+        // Set FileInfo
+        InitFileInfo_(fileInfo);
+
+        fileInfo.fileName = file->d_name;
+        fileInfo.filePath = exploreDirectoryPath_ + fileInfo.fileName;
+        if (stat(fileInfo.filePath.c_str(), &fileStatus) == 0)
+        {
+            getFileStatus = true;
+
+            fileInfo.fileSize = fileStatus.st_size;
+            if (S_ISDIR(fileStatus.st_mode) == true)
+            {
+                fileInfo.isDirectory = true;
+            }
+        }
+
+        if (detailFileInfo == true && getFileStatus == true)
+        {
+            fileInfo.deviceId = fileStatus.st_dev;
+            fileInfo.inodeNumber = fileStatus.st_ino;
+            fileInfo.mode = fileStatus.st_mode;
+            fileInfo.uid = fileStatus.st_uid;
+            fileInfo.gid = fileStatus.st_gid;
+            fileInfo.lastAccessTime = fileStatus.st_atime;
+            fileInfo.lastModificationTime = fileStatus.st_mtime;
+            fileInfo.lastStatusChangeTime = fileStatus.st_ctime;
+        }
+
+        retValue = exploreFileCallback(fileInfo, userContext);
+        if (retValue == Errors::kEnterDirectory && fileInfo.isDirectory == true)
+        {
+            retValue = this->StartExploreFile(fileInfo.filePath, exploreFileCallback, userContext, detailFileInfo);
+            if (retValue == Errors::kStopExplore)
+            {
+                return retValue;
+            }
+        }
+        else if (retValue == Errors::kStopExplore)
+        {
+            return retValue;
+        }
+        else
+        {
+            retValue = Errors::kUnsuccess;
+        }
+    }
+
+    if (errno != 0)
+    {
+        return retValue;
+    }
+
+    retValue = Errors::kSuccess;
+    return retValue;
+}
+
+#endif
+
 EzExplore::Errors EzExplore::ExploreFile::GetItemCount(
-    _In_ const std::wstring& directoryPath,
-    _Out_opt_ uint32_t* fileCount,
-    _Out_opt_ uint32_t* directoryCount
+#ifdef _WIN32
+    const std::wstring& directoryPath,
+#elif __linux__
+    const std::string& directoryPath,
+#endif
+    /*_Out_opt_*/ uint32_t* fileCount,
+    /*_Out_opt_*/ uint32_t* directoryCount
 )
 {
     Errors retValue = Errors::kUnsuccess;
 
     uint32_t countArray[2] = { 0, }; // Index 0: File Count, Index 1: Directory Count
 
-    auto exploreCallbackLambda = [](_In_ const FileInfo& fileInfo, _In_opt_ void* userContext)->Errors
+    auto exploreCallbackLambda = [](const FileInfo& fileInfo, /*_In_opt_*/ void* userContext)->Errors
     {
         if (fileInfo.isDirectory == true)
         {
@@ -162,13 +287,27 @@ EzExplore::Errors EzExplore::ExploreFile::GetItemCount(
 }
 
 void EzExplore::ExploreFile::InitFileInfo_(
-    _Out_ FileInfo& fileInfo
+    /*_Out_*/ FileInfo& fileInfo
 )
 {
+    // Detail
+#ifdef _WIN32
     fileInfo.fileAttributes = 0;
     fileInfo.creationTime = 0;
     fileInfo.lastAccessTime = 0;
     fileInfo.lastWriteTime = 0;
+#elif __linux__
+    fileInfo.deviceId = 0;
+    fileInfo.inodeNumber = 0;
+    fileInfo.mode = 0;
+    fileInfo.uid = 0;
+    fileInfo.gid = 0;
+    fileInfo.lastAccessTime = 0;
+    fileInfo.lastModificationTime = 0;
+    fileInfo.lastStatusChangeTime = 0;
+#endif
+
+    // Normal
     fileInfo.fileSize = 0;
     if (fileInfo.fileName.length() != 0)
     {

@@ -1,0 +1,1 @@
+add_executable(EzExplore "main.cpp" "ExploreErrors.h" "ExploreFile.cpp" "ExploreFile.h")
