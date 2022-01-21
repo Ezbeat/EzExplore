@@ -4,7 +4,7 @@
 #include <inttypes.h>
 
 EzExplore::Errors exploreFileCallback(
-    const EzExplore::FileInfoA& fileInfo,
+    const EzExplore::FileInfo& fileInfo,
     /*_In_opt_*/ void* userContext
 )
 {
