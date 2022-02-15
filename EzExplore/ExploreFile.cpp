@@ -1,4 +1,4 @@
-#include "ExploreFile.h"
+﻿#include "ExploreFile.h"
 
 #ifdef _WIN32
 #include <Windows.h>

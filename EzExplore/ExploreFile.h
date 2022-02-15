@@ -1,4 +1,4 @@
-#ifndef __H_EXPLOREFILE_H__
+﻿#ifndef __H_EXPLOREFILE_H__
 #define __H_EXPLOREFILE_H__
 
 #include "ExploreErrors.h"
