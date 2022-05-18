@@ -7,6 +7,12 @@
 #include <string>
 #include <functional>
 
+#ifdef _WIN32
+#elif __linux__
+#include <sys/stat.h>
+#include <string.h>
+#endif
+
 namespace EzExplore
 {
 #ifdef _WIN32
@@ -40,28 +46,32 @@ struct FileInfo
 {
     FileInfo()
     {
-        deviceId = 0;
-        inodeNumber = 0;
-        mode = 0;
+        attributes = 0;
+        numberOfHardLinks = 0;
         uid = 0;
         gid = 0;
-        lastAccessTime = 0;
-        lastModificationTime = 0;
-        lastStatusChangeTime = 0;
+        fileMode = 0;
+        inodeNumber = 0;
+        memset(&lastAccessTime, 0, sizeof(statx_timestamp));
+        memset(&creationTime, 0, sizeof(statx_timestamp));
+        memset(&lastAttributeChangeTime, 0, sizeof(statx_timestamp));
+        memset(&lastModificationTime, 0, sizeof(statx_timestamp));
 
         fileSize = 0;
         isDirectory = false;
     }
 
     // Detail
-    dev_t deviceId;
-    ino_t inodeNumber;
-    mode_t mode;
-    uid_t uid;
-    gid_t gid;
-    time_t lastAccessTime;
-    time_t lastModificationTime;
-    time_t lastStatusChangeTime;
+    uint64_t attributes;
+    uint32_t numberOfHardLinks;
+    uint32_t uid;
+    uint32_t gid;
+    uint16_t fileMode;
+    uint64_t inodeNumber;
+    struct statx_timestamp lastAccessTime;
+    struct statx_timestamp creationTime;
+    struct statx_timestamp lastAttributeChangeTime;
+    struct statx_timestamp lastModificationTime;
 
     // Normal
     uint64_t fileSize;

@@ -3,8 +3,8 @@
 #ifdef _WIN32
 #include <Windows.h>
 #elif __linux__
-#include <sys/stat.h>
 #include <dirent.h>
+#include <fcntl.h>
 #endif
 
 EzExplore::ExploreFile::ExploreFile()
@@ -143,8 +143,8 @@ EzExplore::Errors EzExplore::ExploreFile::StartExploreFile(
 
     DIR* dir = nullptr;
     dirent* file = nullptr;
-    struct stat fileStatus = { 0, };
-    bool getFileStatus = false;
+    struct statx statxData = { 0, };
+    bool getStatx = false;
     FileInfo fileInfo;
 
     auto raii = RAIIRegister([&]
@@ -186,27 +186,46 @@ EzExplore::Errors EzExplore::ExploreFile::StartExploreFile(
 
         fileInfo.fileName = file->d_name;
         fileInfo.filePath = exploreDirectoryPath_ + fileInfo.fileName;
-        if (stat(fileInfo.filePath.c_str(), &fileStatus) == 0)
+        if (statx(
+            AT_FDCWD,
+            fileInfo.filePath.c_str(),
+            AT_SYMLINK_NOFOLLOW,
+            STATX_SIZE | STATX_MODE,
+            &statxData
+        ) == -1)
         {
-            getFileStatus = true;
-
-            fileInfo.fileSize = fileStatus.st_size;
-            if (S_ISDIR(fileStatus.st_mode) == true)
-            {
-                fileInfo.isDirectory = true;
-            }
+            continue;
         }
 
-        if (detailFileInfo == true && getFileStatus == true)
+        fileInfo.fileSize = statxData.stx_size;
+        if (S_ISDIR(statxData.stx_mode) == true)
         {
-            fileInfo.deviceId = fileStatus.st_dev;
-            fileInfo.inodeNumber = fileStatus.st_ino;
-            fileInfo.mode = fileStatus.st_mode;
-            fileInfo.uid = fileStatus.st_uid;
-            fileInfo.gid = fileStatus.st_gid;
-            fileInfo.lastAccessTime = fileStatus.st_atime;
-            fileInfo.lastModificationTime = fileStatus.st_mtime;
-            fileInfo.lastStatusChangeTime = fileStatus.st_ctime;
+            fileInfo.isDirectory = true;
+        }
+
+        if (detailFileInfo == true)
+        {
+            if (statx(
+                AT_FDCWD,
+                fileInfo.filePath.c_str(),
+                AT_SYMLINK_NOFOLLOW,
+                STATX_ALL,
+                &statxData
+            ) == -1)
+            {
+                continue;
+            }
+
+            fileInfo.attributes = statxData.stx_attributes;
+            fileInfo.numberOfHardLinks = statxData.stx_nlink;
+            fileInfo.uid = statxData.stx_uid;
+            fileInfo.gid = statxData.stx_gid;
+            fileInfo.fileMode = statxData.stx_mode;
+            fileInfo.inodeNumber = statxData.stx_ino;
+            fileInfo.lastAccessTime = statxData.stx_atime;
+            fileInfo.creationTime = statxData.stx_btime;
+            fileInfo.lastAttributeChangeTime = statxData.stx_ctime;
+            fileInfo.lastModificationTime = statxData.stx_mtime;
         }
 
         retValue = exploreFileCallback(fileInfo, userContext);
@@ -295,14 +314,16 @@ void EzExplore::ExploreFile::InitFileInfo_(
     fileInfo.lastAccessTime = 0;
     fileInfo.lastWriteTime = 0;
 #elif __linux__
-    fileInfo.deviceId = 0;
-    fileInfo.inodeNumber = 0;
-    fileInfo.mode = 0;
+    fileInfo.attributes = 0;
+    fileInfo.numberOfHardLinks = 0;
     fileInfo.uid = 0;
     fileInfo.gid = 0;
-    fileInfo.lastAccessTime = 0;
-    fileInfo.lastModificationTime = 0;
-    fileInfo.lastStatusChangeTime = 0;
+    fileInfo.fileMode = 0;
+    fileInfo.inodeNumber = 0;
+    memset(&fileInfo.lastAccessTime, 0, sizeof(statx_timestamp));
+    memset(&fileInfo.creationTime, 0, sizeof(statx_timestamp));
+    memset(&fileInfo.lastAttributeChangeTime, 0, sizeof(statx_timestamp));
+    memset(&fileInfo.lastModificationTime, 0, sizeof(statx_timestamp));
 #endif
 
     // Normal
